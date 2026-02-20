@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Trash2, ArrowDownUp, Info, Lightbulb, CheckCircle2, Trophy, AlertCircle } from 'lucide-react';
 
 // --- Constants & Data ---
@@ -11,35 +11,11 @@ const SUITS = {
 
 const TILES_DATA = [
   // Man (0-8)
-  { id: 0, type: SUITS.MAN, val: 1, label: '一萬', short: '1萬' },
-  { id: 1, type: SUITS.MAN, val: 2, label: '二萬', short: '2萬' },
-  { id: 2, type: SUITS.MAN, val: 3, label: '三萬', short: '3萬' },
-  { id: 3, type: SUITS.MAN, val: 4, label: '四萬', short: '4萬' },
-  { id: 4, type: SUITS.MAN, val: 5, label: '五萬', short: '5萬' },
-  { id: 5, type: SUITS.MAN, val: 6, label: '六萬', short: '6萬' },
-  { id: 6, type: SUITS.MAN, val: 7, label: '七萬', short: '7萬' },
-  { id: 7, type: SUITS.MAN, val: 8, label: '八萬', short: '8萬' },
-  { id: 8, type: SUITS.MAN, val: 9, label: '九萬', short: '9萬' },
+  ...Array.from({ length: 9 }, (_, i) => ({ id: i, type: SUITS.MAN, val: i + 1, label: `${i + 1}萬`, short: `${i + 1}萬` })),
   // Pin (9-17)
-  { id: 9, type: SUITS.PIN, val: 1, label: '一筒', short: '1筒' },
-  { id: 10, type: SUITS.PIN, val: 2, label: '二筒', short: '2筒' },
-  { id: 11, type: SUITS.PIN, val: 3, label: '三筒', short: '3筒' },
-  { id: 12, type: SUITS.PIN, val: 4, label: '四筒', short: '4筒' },
-  { id: 13, type: SUITS.PIN, val: 5, label: '五筒', short: '5筒' },
-  { id: 14, type: SUITS.PIN, val: 6, label: '六筒', short: '6筒' },
-  { id: 15, type: SUITS.PIN, val: 7, label: '七筒', short: '7筒' },
-  { id: 16, type: SUITS.PIN, val: 8, label: '八筒', short: '8筒' },
-  { id: 17, type: SUITS.PIN, val: 9, label: '九筒', short: '9筒' },
+  ...Array.from({ length: 9 }, (_, i) => ({ id: i + 9, type: SUITS.PIN, val: i + 1, label: `${i + 1}筒`, short: `${i + 1}筒` })),
   // Sou (18-26)
-  { id: 18, type: SUITS.SOU, val: 1, label: '一索', short: '1索' },
-  { id: 19, type: SUITS.SOU, val: 2, label: '二索', short: '2索' },
-  { id: 20, type: SUITS.SOU, val: 3, label: '三索', short: '3索' },
-  { id: 21, type: SUITS.SOU, val: 4, label: '四索', short: '4索' },
-  { id: 22, type: SUITS.SOU, val: 5, label: '五索', short: '5索' },
-  { id: 23, type: SUITS.SOU, val: 6, label: '六索', short: '6索' },
-  { id: 24, type: SUITS.SOU, val: 7, label: '七索', short: '7索' },
-  { id: 25, type: SUITS.SOU, val: 8, label: '八索', short: '8索' },
-  { id: 26, type: SUITS.SOU, val: 9, label: '九索', short: '9索' },
+  ...Array.from({ length: 9 }, (_, i) => ({ id: i + 18, type: SUITS.SOU, val: i + 1, label: `${i + 1}索`, short: `${i + 1}索` })),
   // Honors (27-33)
   { id: 27, type: SUITS.HONOR, val: 1, label: '東', short: '東' },
   { id: 28, type: SUITS.HONOR, val: 2, label: '南', short: '南' },
@@ -54,46 +30,45 @@ const TILES_DATA = [
 
 const getTileCounts = (handIds) => {
   const counts = new Array(34).fill(0);
-  handIds.forEach(id => counts[id]++);
+  handIds.forEach(id => {
+    if (id >= 0 && id < 34) counts[id]++;
+  });
   return counts;
 };
 
-const checkWin = (counts) => {
-  const currentCounts = [...counts];
-  for (let i = 0; i < 34; i++) {
-    if (currentCounts[i] >= 2) {
-      currentCounts[i] -= 2;
-      if (checkSets(currentCounts, 0)) return true;
-      currentCounts[i] += 2; 
+const checkSets = (counts) => {
+  let i = 0;
+  while (i < 34 && counts[i] === 0) i++;
+  if (i === 34) return true;
+
+  // Try Triple (刻子)
+  if (counts[i] >= 3) {
+    counts[i] -= 3;
+    if (checkSets(counts)) return true;
+    counts[i] += 3;
+  }
+
+  // Try Sequence (順子) - Only for non-honor tiles
+  if (i < 27 && i % 9 <= 6) {
+    if (counts[i + 1] > 0 && counts[i + 2] > 0) {
+      counts[i]--;
+      counts[i + 1]--;
+      counts[i + 2]--;
+      if (checkSets(counts)) return true;
+      counts[i]++;
+      counts[i + 1]++;
+      counts[i + 2]++;
     }
   }
   return false;
 };
 
-const checkSets = (counts, depth) => {
-  if (depth === 4) return true;
-  let i = 0;
-  while (i < 34 && counts[i] === 0) i++;
-  if (i === 34) return true;
-
-  if (counts[i] >= 3) {
-    counts[i] -= 3;
-    if (checkSets(counts, depth + 1)) return true;
-    counts[i] += 3;
-  }
-
-  if (i < 27) {
-    const suitIndex = i % 9;
-    if (suitIndex <= 6) {
-      if (counts[i+1] > 0 && counts[i+2] > 0) {
-        counts[i]--;
-        counts[i+1]--;
-        counts[i+2]--;
-        if (checkSets(counts, depth + 1)) return true;
-        counts[i]++;
-        counts[i+1]++;
-        counts[i+2]++;
-      }
+const checkWin = (counts) => {
+  for (let i = 0; i < 34; i++) {
+    if (counts[i] >= 2) {
+      const tempCounts = [...counts];
+      tempCounts[i] -= 2;
+      if (checkSets(tempCounts)) return true;
     }
   }
   return false;
@@ -117,7 +92,6 @@ const solveHand = (currentHandIds) => {
 
 const analyzeDiscards = (handIds) => {
   if (handIds.length !== 14) return [];
-
   const uniqueTileIds = [...new Set(handIds)];
   const suggestions = [];
 
@@ -125,9 +99,7 @@ const analyzeDiscards = (handIds) => {
     const tempHand = [...handIds];
     const idx = tempHand.indexOf(discardId);
     tempHand.splice(idx, 1);
-
     const waits = solveHand(tempHand);
-
     if (waits.length > 0) {
       suggestions.push({
         discard: TILES_DATA.find(t => t.id === discardId),
@@ -140,78 +112,41 @@ const analyzeDiscards = (handIds) => {
   return suggestions.sort((a, b) => b.count - a.count);
 };
 
-// --- Colors & Renderers ---
+// --- Renderers ---
 const C_RED = "#D32F2F";
 const C_GREEN = "#388E3C";
 const C_BLUE = "#1976D2";
 const C_BLACK = "#212121";
 
-const RenderMan = ({ val }) => {
+const TileContent = ({ data }) => {
   const chars = ["一", "二", "三", "四", "五", "六", "七", "八", "九"];
-  return (
-    <div className="flex flex-col items-center justify-center w-full h-full leading-none font-serif">
-      <span className="text-xs font-bold" style={{ color: C_BLACK }}>{chars[val-1]}</span>
-      <span className="text-sm font-bold mt-[-2px]" style={{ color: C_RED }}>萬</span>
-    </div>
-  );
-};
-
-const RenderPin = ({ val }) => {
-  const chars = ["一", "二", "三", "四", "五", "六", "七", "八", "九"];
-  return (
-    <div className="flex flex-col items-center justify-center w-full h-full leading-none font-serif">
-      <span className="text-xs font-bold" style={{ color: C_BLACK }}>{chars[val-1]}</span>
-      <span className="text-sm font-bold mt-[-2px]" style={{ color: C_BLUE }}>筒</span>
-    </div>
-  );
-};
-
-const RenderSou = ({ val }) => {
-    const chars = ["一", "二", "三", "四", "五", "六", "七", "八", "九"];
-    return (
-        <div className="flex flex-col items-center justify-center w-full h-full leading-none font-serif">
-            <span className="text-xs font-bold" style={{ color: C_BLACK }}>{chars[val-1]}</span>
-            <span className="text-sm font-bold mt-[-2px]" style={{ color: C_GREEN }}>索</span>
-        </div>
-    );
-};
-
-const RenderHonor = ({ val }) => {
+  if (data.type === SUITS.HONOR) {
     let char = "";
     let color = C_BLACK;
-    let isRect = false;
-
-    switch(val) {
+    switch(data.val) {
         case 1: char = "東"; break;
         case 2: char = "南"; break;
         case 3: char = "西"; break;
         case 4: char = "北"; break;
         case 5: char = "中"; color = C_RED; break;
         case 6: char = "發"; color = C_GREEN; break;
-        case 7: isRect = true; break;
-        default: break;
+        case 7: return <div className="w-full h-full p-2"><div className="w-full h-full border-2 border-blue-800 rounded-sm"></div></div>;
     }
+    return <div className="flex items-center justify-center w-full h-full font-serif font-bold text-lg" style={{ color }}>{char}</div>;
+  }
 
-    if (isRect) {
-        return (
-            <div className="w-full h-full flex items-center justify-center p-2">
-                 <div className="w-full h-full border-2 border-blue-800 rounded-sm"></div>
-            </div>
-        )
-    }
+  const suitColor = data.type === SUITS.MAN ? C_RED : data.type === SUITS.PIN ? C_BLUE : C_GREEN;
+  const suitChar = data.type === SUITS.MAN ? "萬" : data.type === SUITS.PIN ? "筒" : "索";
 
-    return (
-        <div className="flex items-center justify-center w-full h-full font-serif font-bold text-base sm:text-lg" style={{ color }}>
-            {char}
-        </div>
-    );
+  return (
+    <div className="flex flex-col items-center justify-center w-full h-full leading-none font-serif">
+      <span className="text-xs font-bold" style={{ color: C_BLACK }}>{chars[data.val-1]}</span>
+      <span className="text-sm font-bold mt-[-2px]" style={{ color: suitColor }}>{suitChar}</span>
+    </div>
+  );
 };
 
-// --- Components ---
-
-const Tile = ({ data, onClick, size = "md", className = "", highlight = false, badge = null }) => {
-  if (!data) return null;
-  
+const Tile = ({ data, onClick, size = "md", className = "", highlight = false, badge = null, disabled = false }) => {
   const sizeClasses = {
     xs: "w-8 h-10",
     sm: "w-10 h-14",
@@ -219,36 +154,23 @@ const Tile = ({ data, onClick, size = "md", className = "", highlight = false, b
     lg: "w-16 h-24"
   };
 
-  const content = () => {
-      switch(data.type) {
-          case SUITS.MAN: return <RenderMan val={data.val} />;
-          case SUITS.PIN: return <RenderPin val={data.val} />;
-          case SUITS.SOU: return <RenderSou val={data.val} />;
-          case SUITS.HONOR: return <RenderHonor val={data.val} />;
-          default: return null;
-      }
-  }
-
   return (
     <div 
-      onClick={() => onClick && onClick(data)}
+      onClick={() => !disabled && onClick && onClick(data)}
       className={`
-        relative group
+        relative group transition-all
         ${sizeClasses[size]} 
-        bg-[#FAFAFA] rounded-md shadow-md 
-        border border-gray-200 
-        ${highlight ? 'ring-2 ring-yellow-400 transform -translate-y-2 z-10' : 'border-b-[5px] border-b-[#15803d]'}
-        flex flex-col items-center justify-center cursor-pointer select-none 
-        hover:-translate-y-1 transition-all active:translate-y-0
-        ${className}
+        bg-[#FAFAFA] rounded-md shadow-md border border-gray-200 
+        ${highlight ? 'ring-2 ring-yellow-400 -translate-y-2 z-10' : 'border-b-[5px] border-b-[#15803d]'}
+        ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer active:translate-y-0 hover:-translate-y-1'}
+        flex flex-col items-center justify-center select-none ${className}
       `}
     >
       <div className="w-full h-full overflow-hidden rounded-t-md p-0.5">
-          {content()}
+          <TileContent data={data} />
       </div>
-      <div className="absolute top-0 left-0 w-full h-[30%] bg-gradient-to-b from-white/40 to-transparent rounded-t-md pointer-events-none"></div>
       {badge && (
-         <span className="absolute -top-3 -right-1 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full shadow-sm whitespace-nowrap z-20 font-bold border border-white">
+         <span className="absolute -top-3 -right-1 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full shadow-sm z-20 font-bold border border-white">
             {badge}
          </span>
       )}
@@ -259,157 +181,29 @@ const Tile = ({ data, onClick, size = "md", className = "", highlight = false, b
 export default function App() {
   const [hand, setHand] = useState([]);
   const [activeTab, setActiveTab] = useState(SUITS.MAN);
-  const [waiting, setWaiting] = useState([]); 
-  const [suggestions, setSuggestions] = useState([]); 
-  const [isWin, setIsWin] = useState(false); 
 
-  useEffect(() => {
-    if (hand.length === 13) {
-      const result = solveHand(hand.map(t => t.id));
-      setWaiting(result);
-      setSuggestions([]);
-      setIsWin(false);
-    } else if (hand.length === 14) {
-      const handIds = hand.map(t => t.id);
-      const winCheck = checkWin(getTileCounts(handIds));
-      setIsWin(winCheck);
-      const result = analyzeDiscards(handIds);
-      setSuggestions(result);
-      setWaiting([]);
-    } else {
-      setWaiting([]);
-      setSuggestions([]);
-      setIsWin(false);
+  const { waiting, suggestions, isWin } = useMemo(() => {
+    const ids = hand.map(t => t.id);
+    if (ids.length === 13) {
+      return { waiting: solveHand(ids), suggestions: [], isWin: false };
+    } else if (ids.length === 14) {
+      const win = checkWin(getTileCounts(ids));
+      return { waiting: [], suggestions: analyzeDiscards(ids), isWin: win };
     }
+    return { waiting: [], suggestions: [], isWin: false };
   }, [hand]);
 
   const addToHand = (tile) => {
     if (hand.length >= 14) return;
-    const count = hand.filter(t => t.id === tile.id).length;
-    if (count >= 4) return;
+    if (hand.filter(t => t.id === tile.id).length >= 4) return;
     setHand([...hand, tile]);
   };
 
   const removeFromHand = (index) => {
-    const newHand = [...hand];
-    newHand.splice(index, 1);
-    setHand(newHand);
+    setHand(prev => prev.filter((_, i) => i !== index));
   };
 
-  const sortHand = () => {
-    const sorted = [...hand].sort((a, b) => a.id - b.id);
-    setHand(sorted);
-  };
-
-  const clearHand = () => setHand([]);
-
-  const renderKeyboard = () => {
-    const tilesToShow = TILES_DATA.filter(t => t.type === activeTab);
-    return (
-      <div className="grid grid-cols-5 sm:grid-cols-9 gap-x-2 gap-y-3 p-2">
-        {tilesToShow.map(tile => {
-            const countInHand = hand.filter(t => t.id === tile.id).length;
-            const isMaxed = countInHand >= 4;
-            return (
-                <div key={tile.id} className={`flex justify-center relative ${isMaxed ? 'opacity-40 pointer-events-none grayscale' : ''}`}>
-                    <Tile data={tile} onClick={addToHand} size="md" />
-                    {countInHand > 0 && (
-                        <span className="absolute -top-2 -right-1 bg-blue-600 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full shadow z-20 border border-white">
-                            {countInHand}
-                        </span>
-                    )}
-                </div>
-            )
-        })}
-      </div>
-    );
-  };
-
-  const renderResult = () => {
-    if (hand.length === 14) {
-      const bestCount = suggestions.length > 0 ? suggestions[0].count : 0;
-      return (
-        <div className="w-full text-left space-y-3 h-full flex flex-col">
-            {isWin && (
-                <div className="bg-gradient-to-r from-yellow-600 to-amber-600 p-3 rounded-lg shadow-lg border border-yellow-400 mb-2 animate-bounce-short">
-                    <div className="flex items-center justify-center gap-3">
-                        <Trophy className="text-white" size={28} />
-                        <h2 className="text-white font-black text-2xl tracking-widest drop-shadow-md">食糊 / 自摸！</h2>
-                        <Trophy className="text-white" size={28} />
-                    </div>
-                </div>
-            )}
-            {suggestions.length > 0 ? (
-                <>
-                     <div className="flex items-center gap-2 mb-1 pb-1 border-b border-green-600/30">
-                        {isWin ? <AlertCircle className="text-green-300" size={20} /> : <Lightbulb className="text-yellow-300" size={24} />}
-                        <h2 className={`font-bold text-lg ${isWin ? 'text-green-200 text-base' : 'text-yellow-300'}`}>
-                            {isWin ? '如果你不想食糊，可以改打：' : '出牌建議 (14隻)'}
-                        </h2>
-                    </div>
-                    <div className="space-y-3 max-h-[160px] overflow-y-auto pr-2 custom-scrollbar flex-1">
-                        {suggestions.map((sug, idx) => (
-                            <div key={idx} className={`bg-green-800/60 p-2 rounded-lg flex items-center gap-3 border ${!isWin && idx === 0 ? 'border-yellow-400/50 bg-green-800' : 'border-transparent'}`}>
-                                <div className="flex flex-col items-center gap-1 min-w-[50px]">
-                                    <span className="text-xs text-green-200">打出</span>
-                                    <Tile data={sug.discard} size="xs" badge={!isWin && idx === 0 && sug.count === bestCount ? "推薦" : null} />
-                                </div>
-                                <div className="flex-1">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className="text-sm font-bold text-white flex items-center gap-1">
-                                            聽 {sug.count} 門牌
-                                            {!isWin && idx === 0 && <span className="text-[10px] bg-yellow-500 text-black px-1 rounded">最廣</span>}
-                                        </span>
-                                    </div>
-                                    <div className="flex flex-wrap gap-1">
-                                        {sug.waiting.map((w, i) => (
-                                            <div key={i} className="flex items-center bg-green-900/50 rounded px-1.5 py-0.5 border border-green-700/50">
-                                                <span className="text-xs text-green-100">{w.short}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </>
-            ) : !isWin && (
-                <div className="text-center flex-1 flex flex-col justify-center">
-                     <p className="text-red-300 font-bold text-lg mb-1">相公 / 無叫糊</p>
-                     <p className="text-slate-300 text-sm">打出任何一隻牌都無法叫糊。</p>
-                </div>
-            )}
-        </div>
-      );
-    }
-    if (hand.length === 13) {
-      if (waiting.length > 0) {
-        return (
-            <div className="text-center w-full flex flex-col justify-center h-full">
-                <h2 className="text-yellow-300 font-bold text-xl mb-3 flex items-center justify-center gap-2">
-                    <CheckCircle2 size={24} /> 叫糊！聽以下 {waiting.length} 隻牌：
-                </h2>
-                <div className="flex flex-wrap justify-center gap-2">
-                    {waiting.map((tile, idx) => <Tile key={idx} data={tile} size="sm" className="!cursor-default" />)}
-                </div>
-            </div>
-        );
-      } else {
-        return (
-            <div className="text-center flex flex-col justify-center h-full">
-               <p className="text-slate-300 font-medium text-lg">尚未叫糊 (Not Waiting)</p>
-               <p className="text-slate-400 text-sm mt-1">試試輸入第 14 隻牌，系統會建議打哪隻。</p>
-            </div>
-        );
-      }
-    }
-    return (
-        <div className="text-center animate-pulse flex flex-col justify-center h-full">
-             <p className="text-green-200 text-lg">請選擇 13 或 14 隻手牌</p>
-             <p className="text-green-400 text-sm mt-1">目前: {hand.length} / 14</p>
-        </div>
-    );
-  };
+  const sortHand = () => setHand(prev => [...prev].sort((a, b) => a.id - b.id));
 
   return (
     <div className="min-h-screen bg-green-800 text-white flex flex-col font-sans select-none">
@@ -423,47 +217,107 @@ export default function App() {
                 <p className="text-[10px] text-green-300">清一色/多面聽 救星</p>
             </div>
         </div>
-        <button 
-          onClick={clearHand}
-          className="text-xs bg-red-600 hover:bg-red-500 px-3 py-1.5 rounded flex items-center gap-1 transition shadow-sm active:transform active:scale-95"
-        >
+        <button onClick={() => setHand([])} className="text-xs bg-red-600 hover:bg-red-500 px-3 py-1.5 rounded flex items-center gap-1 transition shadow-sm active:scale-95">
           <Trash2 size={14} /> 重置
         </button>
       </header>
 
-      <main className="flex-1 flex flex-col items-center p-3 gap-4 max-w-3xl mx-auto w-full overflow-hidden">
-        <div className={`w-full bg-green-700/80 rounded-xl p-4 min-h-[160px] flex flex-col items-center border border-green-500 shadow-xl backdrop-blur-md relative transition-all ${isWin ? 'ring-4 ring-yellow-400 ring-offset-2 ring-offset-green-800 bg-green-800' : ''}`}>
-            {renderResult()}
+      <main className="flex-1 flex flex-col items-center p-3 gap-4 max-w-3xl mx-auto w-full">
+        {/* Result Area */}
+        <div className={`w-full bg-green-700/80 rounded-xl p-4 min-h-[160px] flex flex-col items-center border border-green-500 shadow-xl backdrop-blur-md transition-all ${isWin ? 'ring-4 ring-yellow-400 bg-green-800' : ''}`}>
+          {hand.length === 14 ? (
+            <div className="w-full space-y-3">
+              {isWin && (
+                <div className="bg-gradient-to-r from-yellow-600 to-amber-600 p-3 rounded-lg shadow-lg border border-yellow-400 flex items-center justify-center gap-3 mb-2 animate-bounce-short">
+                  <Trophy className="text-white" size={24} />
+                  <h2 className="text-white font-black text-xl tracking-widest">食糊 / 自摸！</h2>
+                  <Trophy className="text-white" size={24} />
+                </div>
+              )}
+              {suggestions.length > 0 ? (
+                <div className="space-y-2">
+                  <h2 className="text-yellow-300 font-bold text-sm flex items-center gap-2">
+                    <Lightbulb size={18} /> {isWin ? '不想食糊？建議打：' : '建議出牌：'}
+                  </h2>
+                  <div className="max-h-[120px] overflow-y-auto space-y-2 custom-scrollbar pr-1">
+                    {suggestions.map((s, i) => (
+                      <div key={i} className="bg-green-900/60 p-2 rounded-lg flex items-center gap-3 border border-green-600/30">
+                        <Tile data={s.discard} size="xs" disabled />
+                        <div className="flex-1">
+                          <p className="text-xs font-bold text-white">聽 {s.count} 門：{s.waiting.map(w => w.short).join(' ')}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : !isWin && <div className="text-center py-4 text-red-300 font-bold">無叫糊 / 相公</div>}
+            </div>
+          ) : hand.length === 13 ? (
+            <div className="text-center py-4">
+              {waiting.length > 0 ? (
+                <>
+                  <h2 className="text-yellow-300 font-bold text-lg mb-3 flex items-center justify-center gap-2">
+                    <CheckCircle2 size={24} /> 叫糊！聽：
+                  </h2>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {waiting.map((t, idx) => <Tile key={idx} data={t} size="sm" disabled />)}
+                  </div>
+                </>
+              ) : <p className="text-slate-300">未叫糊，請加入第 14 隻牌查看建議</p>}
+            </div>
+          ) : (
+            <div className="text-center py-8 opacity-50">
+              <p className="text-green-200">請輸入 13 或 14 隻手牌 ({hand.length}/14)</p>
+            </div>
+          )}
         </div>
+
+        {/* Hand Display */}
         <div className="w-full">
-            <div className="flex justify-between items-center mb-2 px-1">
-                <span className="text-sm font-medium text-green-100 flex items-center gap-2">
-                    手牌 <span className="text-xs bg-green-900 px-2 py-0.5 rounded-full border border-green-700">{hand.length}/14</span>
-                </span>
-                <button onClick={sortHand} className="text-xs bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded flex items-center gap-1 transition shadow active:transform active:scale-95">
-                    <ArrowDownUp size={14} /> 理牌
-                </button>
-            </div>
-            <div className="bg-green-900/40 p-3 rounded-xl border border-green-800 min-h-[110px] flex flex-wrap gap-2 justify-center items-center shadow-inner">
-                {hand.length === 0 && (
-                    <div className="flex flex-col items-center justify-center text-green-300/50 py-4 w-full">
-                        <Info size={24} className="mb-1"/><span className="text-sm">點擊下方鍵盤加入手牌</span>
-                    </div>
-                )}
-                {hand.map((tile, index) => {
-                    const isSuggested = !isWin && suggestions.length > 0 && index === hand.findIndex(t => t.id === suggestions[0].discard.id);
-                    return <Tile key={`${tile.id}-${index}`} data={tile} size="sm" onClick={() => removeFromHand(index)} className="animate-in fade-in zoom-in duration-200 shadow-lg" highlight={isSuggested}/>;
-                })}
-                {Array.from({ length: Math.max(0, 14 - hand.length) }).map((_, i) => <div key={i} className="w-9 h-12 sm:w-10 sm:h-14 rounded border-2 border-dashed border-green-600/30 bg-green-900/20" />)}
-            </div>
+          <div className="flex justify-between items-center mb-2 px-1">
+            <span className="text-xs font-bold text-green-100 uppercase tracking-widest">目前手牌</span>
+            <button onClick={sortHand} className="text-xs bg-blue-600 px-3 py-1 rounded-full flex items-center gap-1 shadow-md active:scale-95">
+              <ArrowDownUp size={12} /> 理牌
+            </button>
+          </div>
+          <div className="bg-green-900/40 p-3 rounded-xl border border-green-800 min-h-[100px] flex flex-wrap gap-2 justify-center items-center shadow-inner">
+            {hand.map((tile, index) => (
+              <Tile 
+                key={`${tile.id}-${index}`} 
+                data={tile} 
+                size="sm" 
+                onClick={() => removeFromHand(index)}
+                highlight={suggestions.length > 0 && suggestions[0].discard.id === tile.id && !isWin}
+              />
+            ))}
+            {Array.from({ length: 14 - hand.length }).map((_, i) => (
+              <div key={i} className="w-10 h-14 rounded border-2 border-dashed border-green-700/30 bg-green-900/10" />
+            ))}
+          </div>
         </div>
-        <div className="w-full bg-slate-100 rounded-t-2xl sm:rounded-2xl text-slate-900 shadow-2xl overflow-hidden mt-auto sm:mt-0 pb-safe border border-slate-300">
-            <div className="flex border-b border-slate-300 bg-slate-200">
-                {[[SUITS.MAN,'萬子','red'],[SUITS.PIN,'筒子','blue'],[SUITS.SOU,'索子','green'],[SUITS.HONOR,'番子','purple']].map(([s,l,c]) => (
-                    <button key={s} onClick={() => setActiveTab(s)} className={`flex-1 py-3 text-sm font-bold transition-all ${activeTab === s ? `bg-white text-${c}-700 shadow-sm border-t-2 border-t-${c}-600` : 'text-slate-500 hover:bg-slate-100'}`}>{l}</button>
-                ))}
-            </div>
-            <div className="bg-[#E5E5E5] p-2 flex items-center justify-center min-h-[220px]">{renderKeyboard()}</div>
+
+        {/* Keyboard Area */}
+        <div className="w-full bg-slate-100 rounded-2xl text-slate-900 shadow-2xl overflow-hidden mt-auto">
+          <div className="flex bg-slate-200">
+            {[[SUITS.MAN,'萬'],[SUITS.PIN,'筒'],[SUITS.SOU,'索'],[SUITS.HONOR,'番']].map(([s,l]) => (
+              <button key={s} onClick={() => setActiveTab(s)} className={`flex-1 py-3 text-sm font-bold transition-all ${activeTab === s ? 'bg-white text-green-700 shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}>{l}</button>
+            ))}
+          </div>
+          <div className="p-3 grid grid-cols-5 sm:grid-cols-9 gap-2 justify-items-center min-h-[200px] bg-slate-50">
+            {TILES_DATA.filter(t => t.type === activeTab).map(tile => {
+              const count = hand.filter(t => t.id === tile.id).length;
+              return (
+                <Tile 
+                  key={tile.id} 
+                  data={tile} 
+                  onClick={addToHand} 
+                  size="sm" 
+                  disabled={count >= 4 || hand.length >= 14}
+                  badge={count > 0 ? count : null}
+                />
+              );
+            })}
+          </div>
         </div>
       </main>
     </div>
